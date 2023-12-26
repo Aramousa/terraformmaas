@@ -28,22 +28,22 @@ resource "maas_vlan" "tf_vlan" {
   space = maas_space.tf_space.name
 }
 resource "maas_subnet" "tf_subnet" {
-  cidr = "10.88.88.0/24"
+  cidr = "10.10.12.0/24"
   fabric = maas_fabric.tf_fabric.id
   vlan = maas_vlan.tf_vlan.vid
   name = "tf_subnet"
-  gateway_ip = "10.88.88.1"
+  gateway_ip = "10.10.12.1"
   dns_servers = [
-    "1.1.1.1",
+    "1.1.1.1","8.8.8.8"
   ]
   ip_ranges {
     type = "reserved"
-    start_ip = "10.88.88.1"
-    end_ip = "10.88.88.50"
+    start_ip = "10.10.12.1"
+    end_ip = "10.10.12.50"
   }
   ip_ranges {
     type = "dynamic"
-    start_ip = "10.88.88.200"
-    end_ip = "10.88.88.254"
+    start_ip = "10.10.12.200"
+    end_ip = "10.10.12.254"
   }
 }
