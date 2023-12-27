@@ -1,3 +1,4 @@
+#API Linkage Definition
 terraform {
   required_providers {
     maas = {
@@ -12,26 +13,27 @@ provider "maas" {
   api_key     = "dZbSp3KJtMBDRuuGPF:q9zFPRvVRNGM39sesd:M9ERFX96kARXyETBERcXGyz5k2sQGRPc"
   api_url     = "http://10.10.10.26:5240/MAAS"
 }
-
+#Declaring Datasources
 resource "maas_space" "tf_space" {
   name = "tf-space"
 }
-
+#Declaring Fabric 
 resource "maas_fabric" "tf_fabric" {
   name = "tf-fabric"
 }
-
-resource "maas_vlan" "tf_vlan" {
+#Declaring VLAN
+resource "maas_vlan" "tf_vlan2" {
   fabric = maas_fabric.tf_fabric.id
-  vid = 10
-  name = "tf-vlan10"
+  vid = 2
+  name = "tf-vlan2"
   space = maas_space.tf_space.name
 }
-resource "maas_subnet" "tf_subnet" {
+#Declaring Subnet
+resource "maas_subnet" "tf_subnet12" {
   cidr = "10.10.12.0/24"
   fabric = maas_fabric.tf_fabric.id
-  vlan = maas_vlan.tf_vlan.vid
-  name = "tf_subnet"
+  vlan = maas_vlan.tf_vlan2.vid
+  name = "tf_subnet12"
   gateway_ip = "10.10.12.1"
   dns_servers = [
     "1.1.1.1",
@@ -47,4 +49,116 @@ resource "maas_subnet" "tf_subnet" {
     start_ip = "10.10.12.150"
     end_ip = "10.10.12.220"
   }
+}
+#Additional configs (MAAS Resources)#
+
+#MAAS Block Device resource
+resource "maas_block_device" "vdb" {
+  machine = maas_machine.virsh_vm1.id
+  name = "vdb"
+  id_path = "/dev/vdb"
+  size_gigabytes = 12
+  tags = [
+    "ssd",
+  ]
+
+  partitions {
+    size_gigabytes = 5
+    fs_type = "ext4"
+    label = "media"
+    mount_point = "/media"
+  }
+
+  partitions {
+    size_gigabytes = 7
+    fs_type = "ext4"
+    mount_point = "/storage"
+  }
+}
+
+#MAAS DNS Domain resource
+resource "maas_dns_domain" "runsensibletest" {
+  name = "runsensibletest"
+  ttl = 3600
+  authoritative = true
+}
+#MAAS DNS Record resource
+resource "maas_dns_record" "test_a" {
+  type = "A/AAAA"
+  data = "10.10.12.33"
+  fqdn = "test-a.${maas_dns_domain.runsensibletest.name}"
+}
+
+#MAAS HOST resource
+resource "maas_vm_host" "kvm" {
+  type = "virsh"
+  power_address = "qemu+ssh://ubuntu@10.10.12.33/system"
+  tags = [
+    "pod-console-logging",
+    "virtual",
+    "kvm",
+  ]
+}
+
+#MAAS HOST Machine
+resource "maas_vm_host_machine" "kvm" {
+  count = 2
+  vm_host = maas_vm_host.kvm.id
+  cores = 1
+  memory = 2048
+
+  storage_disks {
+    size_gigabytes = 15
+  }
+}
+
+#MAAS tag resource
+resource "maas_tag" "kvm" {
+  name = "kvm"
+  machines = [
+    maas_machine.virsh_vm1.id,
+    maas_machine.virsh_vm2.id,
+    maas_vm_host_machine.kvm[0].id,
+    maas_vm_host_machine.kvm[1].id,
+  ]
+}
+
+#
+
+#MAAS Instance resource
+resource "maas_instance" "kvm" {
+  count = 2
+  allocate_params {
+    hostname = maas_vm_host_machine.kvm[count.index].hostname
+    min_cpu_count = 1
+    min_memory = 2048
+    tags = [
+#      maas_tag.virtual.name,
+      maas_tag.kvm.name,
+#      maas_tag.ubuntu.name,
+      
+    ]
+  }
+  deploy_params {
+    distro_series = "focal"
+  }
+}
+
+#MAAS Machine
+resource "maas_machine" "virsh_vm1" {
+  power_type = "virsh"
+  power_parameters = jsonencode({
+    power_address = "qemu+ssh://ubuntu@10.10.12.33/system"
+    power_id = "test-vm1"
+  })
+  pxe_mac_address = "52:54:00:89:f5:3e"
+}
+
+resource "maas_machine" "virsh_vm2" {
+  power_type = "virsh"
+  power_parameters = jsonencode({
+    power_address = "qemu+ssh://ubuntu@10.10.12.34/system"
+    power_id = "test-vm2"
+  })
+  pxe_mac_address = "52:54:00:89:f6:6e"
 }
